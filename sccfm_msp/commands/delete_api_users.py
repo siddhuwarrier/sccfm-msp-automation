@@ -78,7 +78,7 @@ class DeleteApiUsersCommand(Command):
         with msp_portal_client(self.portal_region, portal_key) as portal:
             targets = select_tenants(list_managed_tenants(portal), self.tenants)
             if not targets:
-                raise MspCliError("The MSP portal is not managing any tenants yet.")
+                raise MspCliError("This Manager Org is not managing any orgs yet.")
 
             results = [self._remove(portal, tenant, records) for tenant in targets]
 
@@ -102,7 +102,7 @@ class DeleteApiUsersCommand(Command):
         }
         if not records:
             raise MspCliError(
-                "No tenant managed by this MSP portal has a recorded API-only user, "
+                "No Managed Org has a recorded API-only user, "
                 "so there is nothing to delete.\n"
                 f"'sccfm-msp api-users create --region {self.portal_region}' creates them."
             )

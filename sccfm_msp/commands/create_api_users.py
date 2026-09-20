@@ -91,7 +91,7 @@ class CreateApiUsersCommand(Command):
         with msp_portal_client(self.portal_region, portal_key) as portal:
             targets = select_tenants(list_managed_tenants(portal), self.tenants)
             if not targets:
-                raise MspCliError("The MSP portal is not managing any tenants yet.")
+                raise MspCliError("This Manager Org is not managing any orgs yet.")
 
             results = [self._provision(portal, tenant) for tenant in targets]
 

@@ -35,7 +35,7 @@ class StoreMspApiKeyCommand(Command):
 
         return CommandResult(
             summary=(
-                f"MSP portal API key stored for region '{self.portal_region}'. "
+                f"Manager Org API key stored for region '{self.portal_region}'. "
                 f"{tenant_count} managed tenant(s) visible."
             ),
             outcomes=[
@@ -56,7 +56,7 @@ class StoreMspApiKeyCommand(Command):
                 raise MspCliError(
                     "Security Cloud Control rejected that API key "
                     f"(HTTP {exc.status}).\n"
-                    "Check that it is an MSP portal key and that the region is right "
+                    "Check that it is a Manager Org (MSP Portal) key and that the region is right "
                     f"(you used '{self.portal_region}')."
                 ) from exc
             raise MspCliError(

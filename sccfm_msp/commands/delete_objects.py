@@ -84,7 +84,7 @@ class DeleteObjectsCommand(Command):
 
         if not provisioned:
             raise MspCliError(
-                "No tenant managed by this MSP portal has an API-only user yet, so "
+                "No Managed Org has an API-only user yet, so "
                 "there is no credential to delete objects with.\n"
                 f"Run this first:  sccfm-msp api-users create --region {self.portal_region}"
             )

@@ -25,7 +25,25 @@ from typing import Dict, List, Optional
 import keyring
 
 from .client import normalize_region
-from .errors import CredentialNotFoundError
+from .errors import CredentialNotFoundError, KeyringUnavailableError
+
+#: What to tell someone whose platform has no usable keyring. The failure is most
+#: likely on a headless Linux box, which is exactly where automation tends to run,
+#: so it is worth naming the options rather than leaving a library traceback.
+NO_KEYRING_HELP = """No OS keyring is available, so credentials cannot be stored or read.
+
+  macOS          Keychain is built in; this should work as-is.
+  Windows        Credential Locker is built in; this should work as-is.
+  Linux desktop  gnome-keyring or KWallet must be running and unlocked.
+  Headless/CI    There is no OS keyring in a bare container or CI runner. Either
+                 run inside a session that provides one, for example
+                 'dbus-run-session -- sccfm-msp ...' with gnome-keyring
+                 installed, or point keyring at a backend you trust using
+                 PYTHON_KEYRING_BACKEND.
+
+This CLI deliberately does not fall back to writing secrets in plaintext. For
+unattended use, store them in whatever secret manager you already trust and hand
+them to keyring through a backend."""
 
 #: Namespace used for every entry this CLI puts in the OS keyring.
 KEYRING_SERVICE = "sccfm-msp"
@@ -77,6 +95,30 @@ class TenantRecord:
         )
 
 
+def _get_secret(service: str, key: str) -> Optional[str]:
+    try:
+        return keyring.get_password(service, key)
+    except keyring.errors.KeyringError as exc:
+        raise KeyringUnavailableError(f"{NO_KEYRING_HELP}\n\nkeyring said: {exc}") from exc
+
+
+def _set_secret(service: str, key: str, secret: str) -> None:
+    try:
+        keyring.set_password(service, key, secret)
+    except keyring.errors.KeyringError as exc:
+        raise KeyringUnavailableError(f"{NO_KEYRING_HELP}\n\nkeyring said: {exc}") from exc
+
+
+def _delete_secret(service: str, key: str) -> None:
+    """Deleting something that was never stored is not an error."""
+    try:
+        keyring.delete_password(service, key)
+    except keyring.errors.PasswordDeleteError:
+        pass
+    except keyring.errors.KeyringError as exc:
+        raise KeyringUnavailableError(f"{NO_KEYRING_HELP}\n\nkeyring said: {exc}") from exc
+
+
 class CredentialStore:
     """Reads and writes the MSP portal key, tenant tokens, and tenant index."""
 
@@ -96,13 +138,13 @@ class CredentialStore:
         return f"msp-portal:{normalize_region(region)}"
 
     def save_portal_key(self, region: str, api_key: str) -> None:
-        keyring.set_password(KEYRING_SERVICE, self._portal_key_id(region), api_key)
+        _set_secret(KEYRING_SERVICE, self._portal_key_id(region), api_key)
 
     def load_portal_key(self, region: str) -> str:
-        token = keyring.get_password(KEYRING_SERVICE, self._portal_key_id(region))
+        token = _get_secret(KEYRING_SERVICE, self._portal_key_id(region))
         if not token:
             raise CredentialNotFoundError(
-                f"No MSP portal API key stored for region '{region}'.\n"
+                f"No Manager Org (MSP Portal) API key stored for region '{region}'.\n"
                 f"Run:  sccfm-msp login --region {region}"
             )
         return token
@@ -117,10 +159,10 @@ class CredentialStore:
         return f"tenant:{tenant_uid}"
 
     def save_tenant_token(self, tenant_uid: str, token: str) -> None:
-        keyring.set_password(KEYRING_SERVICE, self._tenant_token_id(tenant_uid), token)
+        _set_secret(KEYRING_SERVICE, self._tenant_token_id(tenant_uid), token)
 
     def load_tenant_token(self, tenant_uid: str) -> str:
-        token = keyring.get_password(KEYRING_SERVICE, self._tenant_token_id(tenant_uid))
+        token = _get_secret(KEYRING_SERVICE, self._tenant_token_id(tenant_uid))
         if not token:
             raise CredentialNotFoundError(
                 f"No API-only user token stored for tenant {tenant_uid}.\n"
@@ -130,10 +172,7 @@ class CredentialStore:
 
     def forget_tenant_token(self, tenant_uid: str) -> None:
         """Drop a tenant's token. Deleting one that was never stored is fine."""
-        try:
-            keyring.delete_password(KEYRING_SERVICE, self._tenant_token_id(tenant_uid))
-        except keyring.errors.PasswordDeleteError:
-            pass
+        _delete_secret(KEYRING_SERVICE, self._tenant_token_id(tenant_uid))
 
     # ------------------------------------------------------------------
     # Non-secret tenant index

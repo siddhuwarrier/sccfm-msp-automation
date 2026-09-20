@@ -75,9 +75,9 @@ _region_option = click.option(
     show_default=True,
     metavar="REGION",
     help=(
-        "Region your MSP portal lives in "
+        "Region your Manager Org (MSP Portal) lives in "
         f"({', '.join(PRODUCTION_REGIONS)}). All MSP-level calls go here. Object "
-        "creation instead uses each tenant's own region, detected from the API."
+        "creation instead uses each Managed Org's own region, detected from the API."
     ),
 )
 
@@ -121,13 +121,13 @@ def _report(result: CommandResult) -> None:
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(__version__, prog_name="sccfm-msp")
 def cli() -> None:
-    """Manage Security Cloud Control Firewall Manager tenants as an MSP.
+    """Automate Security Cloud Control Firewall Manager across your Managed Orgs.
 
     Typical first run:
 
     \b
-      sccfm-msp login                 # store your MSP portal API key
-      sccfm-msp tenants list          # see the tenants you manage
+      sccfm-msp login                 # store your Manager Org API key
+      sccfm-msp tenants list          # see the Managed Orgs you manage
       sccfm-msp api-users create      # create an API-only user in each of them
       sccfm-msp objects create --type NETWORK_OBJECT --name lab-net --value 10.10.10.0/24
     """
@@ -143,14 +143,14 @@ def cli() -> None:
 @click.option(
     "--api-key",
     help=(
-        "MSP portal API key. Omit it and you are prompted instead, so the key is "
-        "not echoed and does not land in your shell history."
+        "Manager Org (MSP Portal) API key. Omit it and you are prompted instead, so "
+        "the key is not echoed and does not land in your shell history."
     ),
 )
 def login(portal_region: str, api_key: str) -> None:
-    """Verify an MSP portal API key and store it in the OS keyring."""
+    """Verify a Manager Org (MSP Portal) API key and store it in the OS keyring."""
     if not api_key:
-        api_key = click.prompt("MSP portal API key", hide_input=True)
+        api_key = click.prompt("Manager Org API key", hide_input=True)
 
     _run(
         StoreMspApiKeyCommand(
@@ -166,7 +166,7 @@ def login(portal_region: str, api_key: str) -> None:
 
 @cli.group("tenants")
 def tenants_group() -> None:
-    """Inspect the tenants managed by your MSP portal."""
+    """Inspect the Managed Orgs (tenants) your Manager Org manages."""
 
 
 @tenants_group.command("list")
@@ -183,7 +183,7 @@ def tenants_list(portal_region: str) -> None:
 
 @cli.group("api-users")
 def api_user_group() -> None:
-    """Manage the API-only users this CLI uses to reach each tenant."""
+    """Manage the API-only users this CLI uses to reach each Managed Org."""
 
 
 @api_user_group.command("create")
@@ -284,7 +284,7 @@ def api_users_delete(
 
 @cli.group("objects")
 def objects_group() -> None:
-    """Create and delete objects across your managed tenants."""
+    """Create and delete objects across your Managed Orgs."""
 
 
 @objects_group.command("create")

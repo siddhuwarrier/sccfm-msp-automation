@@ -19,6 +19,15 @@ class CredentialNotFoundError(MspCliError):
     """A credential we expected to find in the keyring is not there."""
 
 
+class KeyringUnavailableError(MspCliError):
+    """There is no OS keyring to read or write, so credentials cannot be used.
+
+    Most often a headless Linux box — a container or CI runner — where no secret
+    service is running. Distinct from `CredentialNotFoundError`, which means the
+    keyring worked and simply had nothing stored.
+    """
+
+
 class TransactionFailedError(MspCliError):
     """An asynchronous Security Cloud Control transaction ended in ERROR."""
 

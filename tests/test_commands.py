@@ -84,7 +84,7 @@ def test_rerun_is_idempotent_unless_replace_is_requested(store, fake_apis, tenan
 
 
 def test_requires_a_stored_portal_key(store, fake_apis):
-    with pytest.raises(MspCliError, match="No MSP portal API key stored"):
+    with pytest.raises(MspCliError, match="No Manager Org"):
         CreateApiUsersCommand(store, portal_region=PORTAL_REGION).execute()
 
 

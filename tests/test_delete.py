@@ -260,3 +260,53 @@ def test_objects_delete_needs_an_api_only_user(store, fake_apis):
         DeleteObjectsCommand(
             store, portal_region=PORTAL_REGION, object_name="lab-net"
         ).execute()
+
+
+# ----------------------------------------------------------------------
+# Platforms without a usable keyring
+# ----------------------------------------------------------------------
+
+
+def test_no_keyring_is_a_readable_error_not_a_traceback(store, monkeypatch):
+    """Headless Linux — a container or CI runner — has no secret service.
+
+    That is where automation tends to run, so the failure has to explain itself
+    rather than surfacing keyring's own exception.
+    """
+    import keyring
+    from keyring.errors import NoKeyringError
+
+    from sccfm_msp.errors import KeyringUnavailableError, MspCliError
+
+    def unavailable(*_args, **_kwargs):
+        raise NoKeyringError("No recommended backend was available")
+
+    monkeypatch.setattr(keyring, "get_password", unavailable)
+    monkeypatch.setattr(keyring, "set_password", unavailable)
+
+    for call in (
+        lambda: store.load_portal_key("US"),
+        lambda: store.save_portal_key("US", "k"),
+        lambda: store.load_tenant_token("uid-a"),
+        lambda: store.save_tenant_token("uid-a", "t"),
+    ):
+        with pytest.raises(KeyringUnavailableError) as caught:
+            call()
+        message = str(caught.value)
+        assert "No OS keyring is available" in message  # what happened
+        assert "Headless/CI" in message                 # where it usually happens
+        assert "PYTHON_KEYRING_BACKEND" in message      # what to do about it
+
+    # It is an MspCliError, so the CLI prints it instead of a traceback.
+    assert issubclass(KeyringUnavailableError, MspCliError)
+
+
+def test_a_missing_credential_is_not_reported_as_a_broken_keyring(store, fake_apis):
+    """An empty keyring and an absent keyring are different problems."""
+    from sccfm_msp.errors import CredentialNotFoundError, KeyringUnavailableError
+
+    with pytest.raises(CredentialNotFoundError) as caught:
+        store.load_portal_key("US")
+
+    assert not isinstance(caught.value, KeyringUnavailableError)
+    assert "sccfm-msp login" in str(caught.value)
