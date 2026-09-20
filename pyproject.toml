@@ -1,0 +1,26 @@
+[project]
+name = "sccfm-msp"
+version = "1.1.0"
+description = "Reference implementation: automating Security Cloud Control Firewall Manager across MSP-managed tenants with the Python SDK."
+requires-python = ">=3.9"
+license = "MIT"
+authors = [{ name = "Siddhu Warrier" }]
+dependencies = [
+    "scc-firewall-manager-sdk==1.22.1598",
+    "click>=8.1",
+    "keyring>=24.0",
+]
+
+[project.scripts]
+sccfm-msp = "sccfm_msp.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sccfm_msp*"]
+
+[tool.pytest.ini_options]
+# Any pydantic serializer warning now means a real model mismatch, so fail on it.
+filterwarnings = ["error::UserWarning"]
