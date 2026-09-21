@@ -57,6 +57,32 @@ class CommandResult:
         return not self.failed
 
 
+class Progress:
+    """Where a command says what it is doing, while it is doing it.
+
+    These commands fan out over every managed org, several API calls each, and one
+    of those calls waits on an asynchronous transaction. Without this the terminal
+    sits blank until the whole run finishes, which reads as a hang.
+
+    Commands talk to this instead of printing, so nothing in a command knows about
+    `click`. The default implementation discards everything, which keeps tests and
+    library use quiet.
+    """
+
+    def start(self, total: int, unit: str = "org") -> None:
+        """Called once, when the command knows how much work there is."""
+
+    def step(self, target: str, message: str) -> None:
+        """Progress *within* one item — the calls that make a run feel slow."""
+
+    def item(self, outcome: "ItemOutcome") -> None:
+        """One unit of work finished. Report it now, not at the end."""
+
+
+class NullProgress(Progress):
+    """The default: report nothing."""
+
+
 class Command(ABC):
     """Base class for every action this CLI can perform."""
 
@@ -67,6 +93,9 @@ class Command(ABC):
     #: commands set this to False: they use the ok flag to mean "ready" rather
     #: than "succeeded", and listing something is not itself a failure.
     failures_are_errors: bool = True
+
+    #: Set by the invoker. Commands may call it freely; by default it does nothing.
+    progress: Progress = NullProgress()
 
     @abstractmethod
     def execute(self) -> CommandResult:
@@ -80,11 +109,13 @@ class CommandInvoker:
     audit log, without touching any individual command.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, progress: Optional[Progress] = None) -> None:
         self.history: List[Command] = []
+        self.progress = progress or NullProgress()
 
     def run(self, command: Command) -> CommandResult:
         self.history.append(command)
+        command.progress = self.progress
         return command.execute()
 
     def last(self) -> Optional[Command]:

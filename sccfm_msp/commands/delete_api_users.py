@@ -80,7 +80,12 @@ class DeleteApiUsersCommand(Command):
             if not targets:
                 raise MspCliError("This Manager Org is not managing any orgs yet.")
 
-            results = [self._remove(portal, tenant, records) for tenant in targets]
+            self.progress.start(len(targets))
+            results = []
+            for tenant in targets:
+                removed = self._remove(portal, tenant, records)
+                self.progress.item(removed.outcome)
+                results.append(removed)
 
         deleted = sum(1 for r in results if r.deleted)
         return CommandResult(
@@ -165,6 +170,8 @@ class DeleteApiUsersCommand(Command):
         """Delete the recorded user, returning the name used, or None if absent."""
         username = record.api_user_name
 
+        self.progress.step(tenant.display_name or tenant.name, f"looking up '{username}'")
+
         with step(
             f"looking up '{username}'",
             "GET /v1/msp/tenants/{uid}/users/api-only",
@@ -181,6 +188,8 @@ class DeleteApiUsersCommand(Command):
 
         # The API deletes by name, and the name it knows is the qualified one.
         exact_name = found.name or username
+
+        self.progress.step(tenant.display_name or tenant.name, "deleting the user")
 
         with step(
             f"deleting '{exact_name}'",

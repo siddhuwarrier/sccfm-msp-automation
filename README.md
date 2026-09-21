@@ -119,6 +119,16 @@ Security Cloud Control shows each token **exactly once**, when it is generated, 
 goes straight to the OS keyring. The regions in brackets are being *recorded* for
 step 4, not used here.
 
+This is the slowest command: four API calls per org, one of which waits on an
+asynchronous transaction. It reports as it goes rather than at the end — each org's
+result appears the moment it lands, and the call in flight shows on a transient line
+that gets overwritten, so the finished output is just the results:
+
+```
+Working through 3 orgs…
+  [2/3] Borealis Health: waiting for the add-user transaction…      <- transient
+```
+
 Re-running is safe — orgs that already have a recorded user are skipped unless you
 pass `--replace-existing`.
 
@@ -384,7 +394,7 @@ pip install pytest
 pytest
 ```
 
-85 tests, no network and no real keyring — so they need no credentials and run
+96 tests, no network and no real keyring — so they need no credentials and run
 anywhere, including a CI runner that has no OS keyring.
 
 | File | Tests | Covers |
@@ -392,7 +402,8 @@ anywhere, including a CI runner that has no OS keyring.
 | `test_commands.py` | 39 | Command behaviour: one API-only user per org, each object call using that org's own token, members resolved per org and validated everywhere first, subsets, and one failure not stopping the rest |
 | `test_objects.py` | 20 | The `--type`/`--value` mapping alone: every type builds, the JSON matches what the API expects, bad input is refused readably |
 | `test_delete.py` | 18 | Both deletes, plus the no-keyring path: qualified usernames, per-org object UIDs, idempotence, keeping credentials when a delete fails |
-| `test_cli.py` | 8 | Argument parsing, exit codes, error presentation |
+| `test_progress.py` | 9 | That each org is reported as it finishes, the in-flight call is named, and transaction polling backs off rather than waiting a flat 2s |
+| `test_cli.py` | 10 | Argument parsing, exit codes, error presentation |
 
 Region behaviour is asserted directly: the fixtures put the Manager Org in `US` with
 Managed Orgs in `US`, `EU` and `APJ`, then check that user creation and token issuance

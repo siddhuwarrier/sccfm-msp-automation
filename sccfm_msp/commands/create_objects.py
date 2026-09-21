@@ -92,10 +92,12 @@ class CreateObjectsCommand(Command):
         if self.dry_run:
             return self._describe_dry_run(object_type, targets, member_uids)
 
-        outcomes = [
-            self._create_in_tenant(record, member_uids.get(record.tenant_uid, []))
-            for record in targets
-        ]
+        self.progress.start(len(targets))
+        outcomes = []
+        for record in targets:
+            outcome = self._create_in_tenant(record, member_uids.get(record.tenant_uid, []))
+            self.progress.item(outcome)
+            outcomes.append(outcome)
         created = sum(1 for outcome in outcomes if outcome.ok)
         regions = sorted({record.tenant_region for record in targets})
 
@@ -230,6 +232,7 @@ class CreateObjectsCommand(Command):
         problems: List[str] = []
 
         for record in targets:
+            self.progress.step(record.tenant_name, "checking members exist")
             try:
                 token = self.store.load_tenant_token(record.tenant_uid)
                 with tenant_client(record.tenant_region, token) as api_client:
@@ -308,6 +311,7 @@ class CreateObjectsCommand(Command):
         # Every failure names the tenant UID: the display name is not enough to open
         # a support case or to re-run against just that tenant.
         context = f"tenant {record.tenant_uid} (region {record.tenant_region})"
+        self.progress.step(record.tenant_name, "creating the object")
 
         try:
             token = self.store.load_tenant_token(record.tenant_uid)

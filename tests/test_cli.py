@@ -117,3 +117,30 @@ def test_tenants_list_shows_each_tenants_region(run, fake_apis):
     for region in ("US", "EU", "APJ"):
         assert f"region {region}" in result.output
     assert "3 region(s) (APJ, EU, US)" in result.output
+
+
+def test_streamed_outcomes_are_not_printed_twice(run, fake_apis, tenants):
+    """Results are printed as each org finishes, so the summary must not repeat them."""
+    from sccfm_msp.credentials import CredentialStore
+
+    CredentialStore().save_portal_key("US", "portal-key")
+
+    result = run("api-users", "create")
+
+    assert result.exit_code == 0, result.output
+    for tenant in tenants:
+        assert result.output.count(tenant.display_name) == 1
+
+
+def test_a_listing_still_prints_its_rows(run, fake_apis):
+    """`tenants list` does not stream, so its rows must come from the report."""
+    from sccfm_msp.credentials import CredentialStore
+
+    CredentialStore().save_portal_key("US", "portal-key")
+
+    result = run("tenants", "list")
+
+    assert result.exit_code == 0, result.output
+    assert "Acme" not in result.output  # fixture names are Tenant a/b/c
+    assert result.output.count("Tenant a") == 1
+    assert "managed tenant(s)" in result.output

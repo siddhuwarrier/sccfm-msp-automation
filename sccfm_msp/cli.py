@@ -23,7 +23,9 @@ from .commands import (
     CreateObjectsCommand,
     DeleteApiUsersCommand,
     DeleteObjectsCommand,
+    ItemOutcome,
     ListTenantsCommand,
+    Progress,
     StoreMspApiKeyCommand,
 )
 from .credentials import CredentialStore
@@ -90,28 +92,80 @@ _tenant_option = click.option(
 )
 
 
+class ClickProgress(Progress):
+    """Prints what a command is doing, as it does it.
+
+    These runs make several API calls per managed org and wait on an asynchronous
+    transaction, so a quiet terminal reads as a hang. Each org's result is printed
+    the moment it lands, and the call in flight is shown on a transient line that
+    the next write overwrites — so the finished output is exactly the result lines,
+    with no progress chatter left behind.
+    """
+
+    def __init__(self) -> None:
+        self.printed = 0
+        self.total = 0
+        self._transient = 0
+        self._live = sys.stderr.isatty()
+
+    def start(self, total: int, unit: str = "org") -> None:
+        self.total = total
+        plural = unit if total == 1 else f"{unit}s"
+        click.echo(click.style(f"Working through {total} {plural}…", dim=True), err=True)
+
+    def step(self, target: str, message: str) -> None:
+        if not self._live:
+            return  # Don't spam a log file or a pipe with per-call noise.
+        self.clear()
+        counter = f"[{self.printed + 1}/{self.total}] " if self.total else ""
+        line = click.style(f"  {counter}{target}: {message}…", dim=True)
+        click.echo(line, nl=False, err=True)
+        self._transient = len(click.unstyle(line))
+
+    def item(self, outcome: ItemOutcome) -> None:
+        self.clear()
+        self.printed += 1
+        click.echo(_format_outcome(outcome))
+
+    def clear(self) -> None:
+        """Wipe the transient step line so something else can take its place."""
+        if self._transient:
+            click.echo("\r" + " " * self._transient + "\r", nl=False, err=True)
+            self._transient = 0
+
+
+def _format_outcome(outcome: ItemOutcome) -> str:
+    mark = click.style("✓", fg="green") if outcome.ok else click.style("✗", fg="red")
+    detail = f" — {outcome.detail}" if outcome.detail else ""
+    return f"  {mark} {outcome.target}{detail}"
+
+
 def _run(command: Command) -> None:
     """Execute a command, print its report, and set the exit code.
 
     An expected `MspCliError` becomes a `ClickException`, which click prints as a
     single `Error: ...` line rather than a traceback.
     """
+    progress = ClickProgress()
+
     try:
-        result = CommandInvoker().run(command)
+        result = CommandInvoker(progress=progress).run(command)
     except MspCliError as exc:
+        progress.clear()
         raise click.ClickException(str(exc)) from exc
 
-    _report(result)
+    _report(result, already_printed=progress.printed)
 
     if command.failures_are_errors and not result.ok:
         raise click.exceptions.Exit(1)
 
 
-def _report(result: CommandResult) -> None:
-    for outcome in result.outcomes:
-        mark = click.style("✓", fg="green") if outcome.ok else click.style("✗", fg="red")
-        detail = f" — {outcome.detail}" if outcome.detail else ""
-        click.echo(f"  {mark} {outcome.target}{detail}")
+def _report(result: CommandResult, already_printed: int = 0) -> None:
+    # Commands that stream their outcomes have already put them on screen; only the
+    # ones that don't (a listing, say) need printing here.
+    if not already_printed:
+        for outcome in result.outcomes:
+            click.echo(_format_outcome(outcome))
 
     if result.outcomes:
         click.echo()

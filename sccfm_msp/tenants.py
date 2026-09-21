@@ -105,7 +105,8 @@ def wait_for_transaction(
     api_client: ApiClient,
     transaction: CdoTransaction,
     timeout_seconds: float = 120.0,
-    poll_interval: float = 2.0,
+    first_interval: float = 0.25,
+    max_interval: float = 2.0,
 ) -> CdoTransaction:
     """Poll an async transaction until it reaches DONE, or raise.
 
@@ -118,6 +119,7 @@ def wait_for_transaction(
 
     api = TransactionsApi(api_client)
     deadline = time.monotonic() + timeout_seconds
+    interval = first_interval
     current = transaction
 
     while True:
@@ -136,5 +138,8 @@ def wait_for_transaction(
                 f"{timeout_seconds:.0f}s. It may still finish — re-run to pick it up."
             )
 
-        time.sleep(poll_interval)
+        # Check again soon, then ease off: most of these finish quickly, and a flat
+        # two-second wait was dead time on every org.
+        time.sleep(interval)
+        interval = min(interval * 2, max_interval)
         current = api.get_transaction(current.transaction_uid)

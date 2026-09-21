@@ -93,7 +93,12 @@ class CreateApiUsersCommand(Command):
             if not targets:
                 raise MspCliError("This Manager Org is not managing any orgs yet.")
 
-            results = [self._provision(portal, tenant) for tenant in targets]
+            self.progress.start(len(targets))
+            results = []
+            for tenant in targets:
+                provisioned = self._provision(portal, tenant)
+                self.progress.item(provisioned.outcome)
+                results.append(provisioned)
 
         created = sum(1 for r in results if r.created)
         regions = sorted({r.region for r in results if r.region})
@@ -181,6 +186,9 @@ class CreateApiUsersCommand(Command):
         """Add the user and return its UID once the transaction completes."""
         user_api = MSPUserManagementApi(api_client)
 
+        label = tenant.display_name or tenant.name
+        self.progress.step(label, "adding the user")
+
         with self._step(
             "adding the user",
             "POST /v1/msp/tenants/{uid}/users",
@@ -200,6 +208,8 @@ class CreateApiUsersCommand(Command):
                 ),
             )
 
+        self.progress.step(label, "waiting for the add-user transaction")
+
         with self._step(
             "polling the add-user transaction",
             "GET /v1/transactions/{uid}",
@@ -218,6 +228,8 @@ class CreateApiUsersCommand(Command):
         self, api_client: ApiClient, tenant: MspManagedTenantDto, tenant_region: str
     ) -> str:
         """Find the UID of the API-only user we just created, by name."""
+        self.progress.step(tenant.display_name or tenant.name, "looking the new user up")
+
         with self._step(
             f"looking up the new user '{self.username}'",
             "GET /v1/msp/tenants/{uid}/users/api-only",
@@ -243,6 +255,8 @@ class CreateApiUsersCommand(Command):
         tenant_region: str,
         user_uid: str,
     ) -> str:
+        self.progress.step(tenant.display_name or tenant.name, "issuing its API token")
+
         with self._step(
             f"issuing the token for user {user_uid}",
             "POST /v1/msp/tenants/{uid}/users/{userUid}/token",

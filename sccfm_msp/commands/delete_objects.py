@@ -58,7 +58,12 @@ class DeleteObjectsCommand(Command):
 
     def execute(self) -> CommandResult:
         targets = self._resolve_targets()
-        results = [self._delete_in_tenant(record) for record in targets]
+        self.progress.start(len(targets))
+        results = []
+        for record in targets:
+            removed = self._delete_in_tenant(record)
+            self.progress.item(removed.outcome)
+            results.append(removed)
 
         deleted = sum(1 for r in results if r.deleted)
         regions = sorted({record.tenant_region for record in targets})
@@ -118,6 +123,7 @@ class DeleteObjectsCommand(Command):
     def _delete_in_tenant(self, record: TenantRecord) -> _Removed:
         """One tenant: resolve the name, then delete it. Never raises."""
         context = f"tenant {record.tenant_uid} (region {record.tenant_region})"
+        self.progress.step(record.tenant_name, f"looking for '{self.object_name}'")
 
         try:
             token = self.store.load_tenant_token(record.tenant_uid)
