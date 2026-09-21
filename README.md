@@ -1,5 +1,7 @@
 # sccfm-msp-automation
 
+[![tests](https://github.com/siddhuwarrier/sccfm-msp-automation/actions/workflows/tests.yml/badge.svg)](https://github.com/siddhuwarrier/sccfm-msp-automation/actions/workflows/tests.yml)
+
 > **Personal project — not affiliated with, endorsed by, or supported by Cisco.**
 > A reference implementation to read and fork, not a product. No support
 > commitment, no guarantee it tracks the API.
@@ -17,9 +19,9 @@ sccfm-msp objects create --type NETWORK_OBJECT --name lab-net --value 10.10.10.0
 That last command makes one call per Managed Org, each to the right regional
 endpoint, authenticated as that org's own API-only user.
 
-**Contents** — [Concepts](#concepts) · [Install](#install) · [Walkthrough](#walkthrough) ·
+**Contents** — [Concepts](#concepts) · [Install](#install-and-quickstart) · [Walkthrough](#walkthrough) ·
 [Which endpoint a call goes to](#which-endpoint-a-call-goes-to) ·
-[Where credentials live](#where-credentials-live) · [Tests](#tests) ·
+[Where credentials live](#where-credentials-live) · [Tests and CI](#tests) ·
 [SDK version notes](#sdk-version-notes)
 
 ## Install and Quickstart
@@ -382,7 +384,8 @@ pip install pytest
 pytest
 ```
 
-85 tests, no network and no real keyring.
+85 tests, no network and no real keyring — so they need no credentials and run
+anywhere, including a CI runner that has no OS keyring.
 
 | File | Tests | Covers |
 | --- | --- | --- |
@@ -399,6 +402,19 @@ each org's own host.
 The fakes deliberately reproduce two API behaviours that caused real bugs: the
 add-user transaction returns the **org's** UID rather than the new user's, and
 API-only usernames come back qualified as `name@CDO-tenant-name`.
+
+### Continuous integration
+
+[`.github/workflows/tests.yml`](.github/workflows/tests.yml) runs on every push and
+pull request:
+
+| Job | What it proves |
+| --- | --- |
+| `test` | The suite and `pyflakes` pass on Python 3.9 – 3.14, so the `requires-python` claim stays honest |
+| `install` | `pip install -e .` then `sccfm-msp --help` works on Linux, macOS and Windows |
+
+The `install` job exists because the README tells people to clone and install, and
+that path deserves testing on the platforms they will actually use.
 
 ## SDK version notes
 
