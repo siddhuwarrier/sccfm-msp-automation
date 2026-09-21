@@ -22,6 +22,26 @@ endpoint, authenticated as that org's own API-only user.
 [Where credentials live](#where-credentials-live) · [Tests](#tests) ·
 [SDK version notes](#sdk-version-notes)
 
+## Install and Quickstart
+
+```bash
+git clone https://github.com/siddhuwarrier/sccfm-msp-automation
+cd sccfm-msp-automation
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+sccfm-msp --help
+```
+
+Python 3.9+. Verified on 3.12 and 3.14. Not on PyPI — it is meant to be read and
+forked, so clone it.
+
+The official SDK this is built on:
+[`scc-firewall-manager-sdk`](https://pypi.org/project/scc-firewall-manager-sdk/) ·
+[docs](https://scc-firewall-manager-sdk.readthedocs.io/en/stable/) ·
+[API reference](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/introduction/).
+Published by Cisco Security Cloud Control TAC; this repository is not.
+
 ---
 
 ## Concepts
@@ -45,25 +65,6 @@ Two things follow from this, and they shape everything below:
 > terminology, but command and flag names (`tenants list`, `--tenant`) deliberately
 > match the API, so the mapping to the SDK stays obvious.
 
-## Install
-
-```bash
-git clone https://github.com/siddhuwarrier/sccfm-msp-automation
-cd sccfm-msp-automation
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
-
-Python 3.9+. Verified on 3.12 and 3.14. Not on PyPI — it is meant to be read and
-forked, so clone it.
-
-The official SDK this is built on:
-[`scc-firewall-manager-sdk`](https://pypi.org/project/scc-firewall-manager-sdk/) ·
-[docs](https://scc-firewall-manager-sdk.readthedocs.io/en/stable/) ·
-[API reference](https://developer.cisco.com/docs/cisco-security-cloud-control-firewall-manager/introduction/).
-Published by Cisco Security Cloud Control TAC; this repository is not.
-
 ---
 
 ## Walkthrough
@@ -78,8 +79,8 @@ You are prompted for the key, so it never reaches your shell history. It is veri
 before being saved — a key that cannot list Managed Orgs is not a Manager Org key,
 and `login` says so rather than storing it.
 
-`--region` is where your **Manager Org** lives (`US`, `EU`, `APJ`, `AUS`, `IN`,
-`UAE`; case-insensitive, default `US`). You never specify your Managed Orgs' regions.
+`--region` is where your **Manager Org** (MSP Portal) lives (`US`, `EU`, `APJ`, `AUS`, `IN`,
+`UAE`; case-insensitive, default `US`). You never specify your Managed Orgs' regions; the tool figures it out.
 
 ### 2. See what you manage
 
@@ -401,18 +402,4 @@ API-only usernames come back qualified as `name@CDO-tenant-name`.
 
 ## SDK version notes
 
-Pinned to `scc-firewall-manager-sdk==1.22.1598`. Two defects that shaped earlier
-versions of this project are fixed in that release, noted in case you pin older:
-
-* **Object content was an unusable `oneOf`.** `ObjectContent` was a `oneOf` whose
-  `ServiceObjectContent` and `GroupContent` variants declared no required fields, so
-  they matched any payload and the union never resolved. Every object **response**
-  raised `Multiple matches found when deserializing ... ObjectContent` — *after* the
-  object had been created. It is now one flat schema, with
-  `SharedObjectValue.objectType` saying which fields apply.
-* **The package could not be imported at all** between 1.22.625 and roughly
-  1.22.15xx: `BackupResult` subclassed `TaskResultDetails` while `TaskResultDetails`
-  imported `BackupResult` for its own `oneOf` — a hard circular import.
-
-1.22.624 was the last importable release before the fixes, and needed a raw-response
-workaround for object creation.
+Pinned to `scc-firewall-manager-sdk==1.22.1598`. 
